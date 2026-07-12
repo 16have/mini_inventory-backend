@@ -4,11 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+flask-login = "*"
 flask = "*"
 flask-sqlalchemy = "*"
 flask-migrate = "*"
 flask-cors = "*"
-flask-login = "*"
+werkzeug = "*"
 
 [dev-packages]
 
