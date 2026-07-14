@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mini Inventory</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f5f7fb; }
+      body { margin: 0; } main { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+      h1 { margin: 0 0 .5rem; } .subtle { color: #62708a; }
+      section, form { background: white; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 2px 12px #17203312; }
+      form { display: grid; gap: .75rem; } input, textarea, button { box-sizing: border-box; padding: .7rem; font: inherit; border-radius: 7px; border: 1px solid #cfd7e6; }
+      button { width: fit-content; border: 0; background: #2563eb; color: white; cursor: pointer; } button.secondary { background: #64748b; }
+      .row { display: flex; flex-wrap: wrap; gap: .75rem; } .row > * { flex: 1 1 180px; }
+      #message { min-height: 1.5rem; color: #b42318; } .success { color: #027a48 !important; }
+      table { width: 100%; border-collapse: collapse; } th, td { padding: .65rem; text-align: left; border-bottom: 1px solid #e5eaf2; }
+      #app { display: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Mini Inventory</h1>
+      <p class="subtle">Manage your stock from one deployed application.</p>
+      <p id="message" role="alert"></p>
+
+      <section id="auth">
+        <h2>Sign in</h2>
+        <form id="login-form">
+          <div class="row"><input name="email" type="email" placeholder="Email" required><input name="password" type="password" placeholder="Password" required></div>
+          <button>Sign in</button>
+        </form>
+        <h3>Create an account</h3>
+        <form id="signup-form">
+          <div class="row"><input name="username" placeholder="Username" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" placeholder="Password" required></div>
+          <button>Create account</button>
+        </form>
+      </section>
+
+      <div id="app">
+        <section><button id="logout" class="secondary">Sign out</button><h2>Dashboard</h2><p id="totals">Loading…</p></section>
+        <section>
+          <h2>Add item</h2>
+          <form id="item-form"><div class="row"><input name="name" placeholder="Item name" required><input name="total_stock" type="number" min="0" placeholder="Total stock" required></div><textarea name="description" placeholder="Description (optional)"></textarea><button>Add item</button></form>
+        </section>
+        <section><h2>Items</h2><table><thead><tr><th>Name</th><th>Total</th><th>Used</th><th>Remaining</th></tr></thead><tbody id="items"></tbody></table></section>
+      </div>
+    </main>
+    <script>
+      const state = { token: localStorage.getItem('inventory_token'), user: JSON.parse(localStorage.getItem('inventory_user') || 'null') };
+      const message = (text, ok = false) => { const el = document.querySelector('#message'); el.textContent = text; el.className = ok ? 'success' : ''; };
+      async function api(path, options = {}) {
+        const response = await fetch(`/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}), ...options.headers } });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.message || 'Request failed');
+        return body;
+      }
+      async function loadInventory() {
+        const [dashboard, items] = await Promise.all([api('/dashboard'), api('/items')]);
+        document.querySelector('#totals').textContent = `${dashboard.total_item_types} item types · ${dashboard.remaining_stock} remaining of ${dashboard.total_stock} total`;
+        document.querySelector('#items').innerHTML = items.map(item => `<tr><td>${item.name}</td><td>${item.total_stock}</td><td>${item.used_stock}</td><td>${item.remaining_stock}</td></tr>`).join('') || '<tr><td colspan="4">No items yet.</td></tr>';
+      }
+      async function showApp() {
+        document.querySelector('#auth').style.display = 'none'; document.querySelector('#app').style.display = 'block';
+        try { await loadInventory(); } catch (error) { message(error.message); }
+      }
+      document.querySelector('#login-form').addEventListener('submit', async event => {
+        event.preventDefault(); const data = Object.fromEntries(new FormData(event.target));
+        try { const result = await api('/auth/login', { method: 'POST', body: JSON.stringify(data) }); state.token = result.access_token; state.user = result.user; localStorage.setItem('inventory_token', state.token); localStorage.setItem('inventory_user', JSON.stringify(state.user)); message('Signed in.', true); showApp(); } catch (error) { message(error.message); }
+      });
+      document.querySelector('#signup-form').addEventListener('submit', async event => {
+        event.preventDefault(); try { await api('/auth/signup', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.target)))) }); message('Account created. You can now sign in.', true); event.target.reset(); } catch (error) { message(error.message); }
+      });
+      document.querySelector('#item-form').addEventListener('submit', async event => {
+        event.preventDefault(); const data = Object.fromEntries(new FormData(event.target)); data.total_stock = Number(data.total_stock); data.user_id = state.user.id;
+        try { await api('/items', { method: 'POST', body: JSON.stringify(data) }); event.target.reset(); message('Item added.', true); await loadInventory(); } catch (error) { message(error.message); }
+      });
+      document.querySelector('#logout').addEventListener('click', () => { localStorage.clear(); location.reload(); });
+      if (state.token && state.user) showApp();
+    </script>
+  </body>
+</html>

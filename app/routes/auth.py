@@ -41,9 +41,7 @@ def signup():
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    token = create_access_token(
-    identity=user.id
-    )
+    
     data = request.get_json()
 
     email = data.get("email")
@@ -56,6 +54,10 @@ def login():
 
     if not check_password_hash(user.password_hash, password):
         return jsonify({"message": "Invalid credentials"}), 401
+    
+    token = create_access_token(
+    identity=user.id
+    )
     
     return jsonify({
 

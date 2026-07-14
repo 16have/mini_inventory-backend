@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+from app.extensions import db
 from app.models import Item
 from flask_jwt_extended import jwt_required
 
